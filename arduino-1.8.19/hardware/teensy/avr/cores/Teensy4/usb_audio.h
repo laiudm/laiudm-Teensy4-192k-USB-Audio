@@ -62,6 +62,51 @@ struct usb_audio_features_struct {
 #ifdef __cplusplus
 #include "AudioStream.h"
 
+class Fifo {
+#define FIFO_SIZE 6
+public:
+
+	void insert(const audio_block_t * block) {
+		if (full()) { return; }	// overflow
+		
+		entries[head] = (audio_block_t *)block;
+		head = (head + 1) % FIFO_SIZE;
+		count++;
+	}
+	
+	audio_block_t * remove() {
+		if  (empty()) { return NULL; }
+		
+		audio_block_t * temp = entries[tail];
+		tail = (tail + 1) % FIFO_SIZE;
+		count--;
+		return temp;
+	}
+	
+	audio_block_t * peek() {
+		if  (empty()) { return NULL; }
+		
+		return  entries[tail];
+	}
+	
+	bool empty() {
+		return count == 0;
+	}
+	
+	bool full() {
+		return count == FIFO_SIZE;
+	}
+	
+	Fifo() { }
+	
+private:
+	audio_block_t * entries[FIFO_SIZE];
+	int count = 0;	// don't strictly need this additional variable, but it makes the code easier to read & validate for me.
+	int head = 0;
+	int tail = 0;
+	
+};
+
 class AudioInputUSB : public AudioStream
 {
 public:
@@ -80,8 +125,8 @@ private:
 	static bool update_responsibility;
 	static audio_block_t *incoming_left;
 	static audio_block_t *incoming_right;
-	static audio_block_t *ready_left;
-	static audio_block_t *ready_right;
+	static Fifo rxLFifo;
+	static Fifo rxRFifo;
 	static uint16_t incoming_count;
 	static uint8_t receive_flag;
 };
@@ -93,12 +138,10 @@ public:
 	virtual void update(void);
 	void begin(void);
 	friend unsigned int usb_audio_transmit_callback(void);
+	static Fifo txLFifo;
+	static Fifo txRFifo;
 private:
 	static bool update_responsibility;
-	static audio_block_t *left_1st;
-	static audio_block_t *left_2nd;
-	static audio_block_t *right_1st;
-	static audio_block_t *right_2nd;
 	static uint16_t offset_1st;
 	audio_block_t *inputQueueArray[2];
 };

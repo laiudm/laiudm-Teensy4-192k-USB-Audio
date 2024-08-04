@@ -1,0 +1,3 @@
+teensy41.menu.usb.serialserialaudio=Serial + Serial + 192k Audio
+teensy41.menu.usb.serialserialaudio.build.usbtype=USB_AUDIO192K_SERIAL_SERIAL
+teensy41.menu.usb.serialserialaudio.upload_port.usbtype=USB_AUDIO192K_SERIAL_SERIAL

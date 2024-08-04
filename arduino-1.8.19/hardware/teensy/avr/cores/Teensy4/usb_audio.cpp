@@ -38,8 +38,8 @@
 bool AudioInputUSB::update_responsibility;
 audio_block_t * AudioInputUSB::incoming_left;
 audio_block_t * AudioInputUSB::incoming_right;
-audio_block_t * AudioInputUSB::ready_left;
-audio_block_t * AudioInputUSB::ready_right;
+Fifo AudioInputUSB::rxLFifo;
+Fifo AudioInputUSB::rxRFifo;
 uint16_t AudioInputUSB::incoming_count;
 uint8_t AudioInputUSB::receive_flag;
 
@@ -94,7 +94,7 @@ void usb_audio_configure(void)
 	printf("usb_audio_configure\n");
 	usb_audio_underrun_count = 0;
 	usb_audio_overrun_count = 0;
-	feedback_accumulator = 739875226; // 44.1 * 2^24
+	feedback_accumulator = (AUDIO_SAMPLE_RATE_EXACT / 1000.0f) * 0x1000000; // 44.1 * 2^24
 	if (usb_high_speed) {
 		usb_audio_sync_nbytes = 4;
 		usb_audio_sync_rshift = 8;
@@ -118,8 +118,6 @@ void AudioInputUSB::begin(void)
 	incoming_count = 0;
 	incoming_left = NULL;
 	incoming_right = NULL;
-	ready_left = NULL;
-	ready_right = NULL;
 	receive_flag = 0;
 	// update_responsibility = update_setup();
 	// TODO: update responsibility is tough, partly because the USB
@@ -191,7 +189,7 @@ void usb_audio_receive_callback(unsigned int len)
 			copy_to_buffers(data, left->data + count, right->data + count, avail);
 			data += avail;
 			len -= avail;
-			if (AudioInputUSB::ready_left || AudioInputUSB::ready_right) {
+			if (AudioInputUSB::rxLFifo.full() || AudioInputUSB::rxRFifo.full()) {
 				// buffer overrun, PC sending too fast
 				AudioInputUSB::incoming_count = count + avail;
 				if (len > 0) {
@@ -202,8 +200,8 @@ void usb_audio_receive_callback(unsigned int len)
 				return;
 			}
 			send:
-			AudioInputUSB::ready_left = left;
-			AudioInputUSB::ready_right = right;
+			AudioInputUSB::rxLFifo.insert(left);
+			AudioInputUSB::rxRFifo.insert(right);
 			//if (AudioInputUSB::update_responsibility) AudioStream::update_all();
 			left = AudioStream::allocate();
 			if (left == NULL) {
@@ -224,7 +222,7 @@ void usb_audio_receive_callback(unsigned int len)
 			AudioInputUSB::incoming_right = right;
 			count = 0;
 		} else {
-			if (AudioInputUSB::ready_left || AudioInputUSB::ready_right) return;
+			if (!AudioInputUSB::rxLFifo.empty() || !AudioInputUSB::rxRFifo.empty()) return;
 			goto send; // recover from buffer overrun
 		}
 	}
@@ -237,10 +235,8 @@ void AudioInputUSB::update(void)
 	audio_block_t *left, *right;
 
 	__disable_irq();
-	left = ready_left;
-	ready_left = NULL;
-	right = ready_right;
-	ready_right = NULL;
+	left = AudioInputUSB::rxLFifo.remove();
+	right = AudioInputUSB::rxRFifo.remove();
 	uint16_t c = incoming_count;
 	uint8_t f = receive_flag;
 	receive_flag = 0;
@@ -288,10 +284,8 @@ void AudioInputUSB::update(void)
 
 #if 1
 bool AudioOutputUSB::update_responsibility;
-audio_block_t * AudioOutputUSB::left_1st;
-audio_block_t * AudioOutputUSB::left_2nd;
-audio_block_t * AudioOutputUSB::right_1st;
-audio_block_t * AudioOutputUSB::right_2nd;
+Fifo AudioOutputUSB::txLFifo;
+Fifo AudioOutputUSB::txRFifo;
 uint16_t AudioOutputUSB::offset_1st;
 
 /*DMAMEM*/ uint16_t usb_audio_transmit_buffer[AUDIO_TX_SIZE/2] __attribute__ ((used, aligned(32)));
@@ -310,8 +304,6 @@ static void tx_event(transfer_t *t)
 void AudioOutputUSB::begin(void)
 {
 	update_responsibility = false;
-	left_1st = NULL;
-	right_1st = NULL;
 }
 
 static void copy_from_buffers(uint32_t *dst, int16_t *left, int16_t *right, unsigned int len)
@@ -335,11 +327,11 @@ void AudioOutputUSB::update(void)
 	if (usb_audio_transmit_setting == 0) {
 		if (left) release(left);
 		if (right) release(right);
-		if (left_1st) { release(left_1st); left_1st = NULL; }
-		if (left_2nd) { release(left_2nd); left_2nd = NULL; }
-		if (right_1st) { release(right_1st); right_1st = NULL; }
-		if (right_2nd) { release(right_2nd); right_2nd = NULL; }
+		__disable_irq();
+		while (!txLFifo.empty()) { audio_block_t * t = txLFifo.remove(); release(t); };
+		while (!txRFifo.empty()) { audio_block_t * t = txRFifo.remove(); release(t); };
 		offset_1st = 0;
+		__enable_irq();
 		return;
 	}
 	if (left == NULL) {
@@ -359,25 +351,15 @@ void AudioOutputUSB::update(void)
 		memset(right->data, 0, sizeof(right->data));
 	}
 	__disable_irq();
-	if (left_1st == NULL) {
-		left_1st = left;
-		right_1st = right;
-		offset_1st = 0;
-	} else if (left_2nd == NULL) {
-		left_2nd = left;
-		right_2nd = right;
+	if (!txLFifo.full()) {
+		txLFifo.insert(left);
+		txRFifo.insert(right);
 	} else {
 		// buffer overrun - PC is consuming too slowly
-		audio_block_t *discard1 = left_1st;
-		left_1st = left_2nd;
-		left_2nd = left;
-		audio_block_t *discard2 = right_1st;
-		right_1st = right_2nd;
-		right_2nd = right;
-		offset_1st = 0; // TODO: discard part of this data?
-		//serial_print("*");
-		release(discard1);
-		release(discard2);
+		release(left);
+		release(right);
+		while (!txLFifo.empty()) { audio_block_t * t = txLFifo.remove(); release(t); };
+		while (!txRFifo.empty()) { audio_block_t * t = txRFifo.remove(); release(t); };
 	}
 	__enable_irq();
 }
@@ -392,23 +374,26 @@ unsigned int usb_audio_transmit_callback(void)
 	static uint32_t count=5;
 	uint32_t avail, num, target, offset, len=0;
 	audio_block_t *left, *right;
-
-	if (++count < 10) {   // TODO: dynamic adjust to match USB rate
-		target = 44;
+	if ((int)AUDIO_SAMPLE_RATE_EXACT == 192000) {
+		target = AUDIO_SAMPLE_RATE_EXACT/1000;
 	} else {
-		count = 0;
-		target = 45;
+		if (++count < 10) {   // TODO: dynamic adjust to match USB rate
+			target = 44;
+		} else {
+			count = 0;
+			target = 45;
+		}
 	}
 	while (len < target) {
 		num = target - len;
-		left = AudioOutputUSB::left_1st;
+		left = AudioOutputUSB::txLFifo.peek();
 		if (left == NULL) {
 			// buffer underrun - PC is consuming too quickly
 			memset(usb_audio_transmit_buffer + len, 0, num * 4);
 			//serial_print("%");
 			break;
 		}
-		right = AudioOutputUSB::right_1st;
+		right = AudioOutputUSB::txRFifo.peek();
 		offset = AudioOutputUSB::offset_1st;
 
 		avail = AUDIO_BLOCK_SAMPLES - offset;
@@ -421,10 +406,8 @@ unsigned int usb_audio_transmit_callback(void)
 		if (offset >= AUDIO_BLOCK_SAMPLES) {
 			AudioStream::release(left);
 			AudioStream::release(right);
-			AudioOutputUSB::left_1st = AudioOutputUSB::left_2nd;
-			AudioOutputUSB::left_2nd = NULL;
-			AudioOutputUSB::right_1st = AudioOutputUSB::right_2nd;
-			AudioOutputUSB::right_2nd = NULL;
+			AudioOutputUSB::txLFifo.remove();
+			AudioOutputUSB::txRFifo.remove();
 			AudioOutputUSB::offset_1st = 0;
 		} else {
 			AudioOutputUSB::offset_1st = offset;

@@ -62,7 +62,7 @@
 
 #define noAUDIO_DEBUG_CLASS // disable this class by default
 
-#ifndef __ASSEMBLER__
+#if defined(__cplusplus)
 class AudioStream;
 class AudioConnection;
 #if defined(AUDIO_DEBUG_CLASS)
