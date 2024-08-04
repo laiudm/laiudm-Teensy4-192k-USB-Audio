@@ -31,7 +31,7 @@ usb_audio.ino is a simple sketch for testing the usb audio functionality.
    - For Arduino 1.8.19 Portable installation (https://docs.arduino.cc/software/ide-v1/tutorials/PortableIDE/) the location will be <your root location>\arduino-1.8.19\
    - For Arduino 2.3.2 standard install the location will be C:\Users\<your login name>\AppData\Local\Arduino15\packages\teensy\hardware\avr\1.59.0
 1. Copy arduino-1.8.19/hardware/teensy/avr/boards.local.txt into the hardware/teensy/avr/ directory. The end result will look like:
-	![](/images/avrsubdir.png)
+	![](/images/avrsubdir.PNG)
 1. Copy the 6 files at arduino-1.8.19/hardware/teensy/avr/cores/Teensy4 into your installation’s ...\cores\teensy4 directory, overwriting all existing copies of the file. The end result (date ordered) will look like (only the highlighted files are updated):
 	![](/images/teensy4subdir.PNG)
 1. For Arduino 2, the IDE caches some content so we need to delete a folder. For Windows deleting the folder %AppData%\Roaming\arduino-ide\Local Storage\leveldb is all that's needed. Thanks to https://github.com/K7MDL2/KEITHSDR/wiki/Adding-New-USB-Type-into-the-Arduino-2.x-Tools-Menu for the tip.
