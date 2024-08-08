@@ -78,14 +78,14 @@ Note that the T41 hardware provides significant analogue gain after the DAC outp
 As a simple hack I kept the speaker disconnected and changed the following lines in Process.cpp:
 
     } else if (mute == 0) {
-      arm_scale_f32(float_buffer_L, ***100.0 * ***DF * VolumeToAmplification(audioVolume), float_buffer_L, BUFFER_SIZE * N_BLOCKS);
-      arm_scale_f32(float_buffer_R, ***100.0 * ***DF * VolumeToAmplification(audioVolume), float_buffer_R, BUFFER_SIZE * N_BLOCKS);
+      arm_scale_f32(float_buffer_L, 100.0 * DF * VolumeToAmplification(audioVolume), float_buffer_L, BUFFER_SIZE * N_BLOCKS);
+      arm_scale_f32(float_buffer_R, 100.0 * DF * VolumeToAmplification(audioVolume), float_buffer_R, BUFFER_SIZE * N_BLOCKS);
     }
 	
 ## Possible Linux Issues
 
 
-There may be issues with the library's feedback accumulator algorithm on linux. See comments by jonr in this posting: https://forum.pjrc.com/index.php?threads/usb-audio-samplerates-added.67749/
+There may be issues with the library's feedback accumulator algorithm on linux, although initial testing by John Melton G0ORX is positive. See comments by jonr in this posting: https://forum.pjrc.com/index.php?threads/usb-audio-samplerates-added.67749/
 
 
 Since it works fine on Windows I have not touched the algorithm itself, just its initialisation value (https://github.com/laiudm/laiudm-Teensy4-192k-USB-Audio/blob/485d370d652313c7ec620457280603f0e069c7e8/arduino-1.8.19/hardware/teensy/avr/cores/Teensy4/usb_audio.cpp#L97).

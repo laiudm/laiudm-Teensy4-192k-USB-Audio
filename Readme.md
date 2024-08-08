@@ -40,10 +40,10 @@ usb_audio.ino is a simple sketch for testing the usb audio functionality.
 	- (Linux) $HOME/.arduino15/packages/teensy/hardware/avr/1.59.0/cores/teensy4
 	overwriting all existing copies of the files. The end result (date ordered) will look like (only the highlighted files are updated):
 	![](/images/teensy4subdir.PNG)
-1. For Arduino 2, the IDE caches some content so we need to delete a folder. Deleting the leveldb folder in
+1. For Arduino 2, the IDE caches some content so we need to delete a folder. Thanks to https://github.com/K7MDL2/KEITHSDR/wiki/Adding-New-USB-Type-into-the-Arduino-2.x-Tools-Menu for the tip to just delete the leveldb folder in
 	- (Windows) %AppData%\Roaming\arduino-ide\Local Storage\
 	- (Linux) $HOME/.config/arduino-ide/'Local Storage'
-	is all that's needed. Thanks to https://github.com/K7MDL2/KEITHSDR/wiki/Adding-New-USB-Type-into-the-Arduino-2.x-Tools-Menu for the tip.
+	
 
 ## Testing the Patch
 
