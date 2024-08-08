@@ -57,7 +57,18 @@ https://github.com/K7MDL2/KEITHSDR/wiki/Adding-New-USB-Type-into-the-Arduino-2.x
 
 ## Using usb audio with SDTVer050.0 Software
 
-It is relatively easy to patch the SDT code to confirm it works, but extra work will be required to integrate it properly e.g. 
+It is relatively easy to patch the SDT code to confirm it works by hooking the USB up to the modeSelectIn and Out Mixers using the same ports as the Microphone and Audio Out. For example:
+
+	AudioOutputUSB           usbAudioOut;
+	AudioConnection          patchUSB1Out(modeSelectOutL, 0, usbAudioOut, 0);
+	AudioConnection          patchUSB2Out(modeSelectOutR, 0, usbAudioOut, 1);
+
+	AudioInputUSB            usbAudioIn;
+	AudioConnection          patchUSB1In(usbAudioIn, 0, modeSelectInExL, 0);
+	AudioConnection          patchUSB2In(usbAudioIn, 1, modeSelectInExR, 0);
+
+
+Extra work will be required to integrate it properly e.g. 
 - allow the operator to control between mic input and usb audio input
 - set usb audio out volume level independently of the speaker volume
 - CAT control to control transmit
